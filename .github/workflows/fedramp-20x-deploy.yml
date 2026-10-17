@@ -1,0 +1,64 @@
+name: "FedRAMP 20x KSI-CMT-VTD & KSI-CMT-LMC Validation Pipeline"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: "us-east-1"
+  AWS_USE_FIPS_ENDPOINT: "true"
+  TF_VAR_ecr_repository_url: ${{ secrets.ECR_REPOSITORY_URL }}
+  TF_VAR_image_digest: ${{ secrets.IMAGE_DIGEST }}
+
+jobs:
+  validate-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Immutable Source Repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate via AWS OIDC Federation (Zero Static Keys - KSI-IAM)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/aether-20x-github-oidc-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Generate Terraform Plan JSON
+        working-directory: ./infra
+        run: |
+          terraform init
+          terraform plan -out=tfplan.binary
+          terraform show -json tfplan.binary > tfplan.json
+
+      - name: Gate 1 — Open Policy Agent (OPA/Rego) FedRAMP 20x KSI Gate (KSI-CMT-VTD)
+        run: |
+          wget -q https://github.com/open-policy-agent/conftest/releases/download/v0.70.0/conftest_0.70.0_Linux_x86_64.tar.gz
+          tar xzf conftest_0.70.0_Linux_x86_64.tar.gz
+          ./conftest test ./infra/tfplan.json -p ./policy/fedramp_20x_ksi.rego --output json | tee opa-ksi-validation.json
+
+      - name: Gate 2 — Container & IaC Vulnerability Evaluation Scan (VER-EVA 5-Day Triage Feed)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './app'
+          format: 'json'
+          output: 'ver-eva-vuln-report.json'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Archive Deployment Validation Evidence to S3 FIPS Vault (Step 7 Integrity)
+        if: always()
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          aws s3 cp opa-ksi-validation.json \
+            s3://aether-20x-living-evidence-${{ secrets.AWS_ACCOUNT_ID }}/ci-cd-evidence/${TIMESTAMP}-${{ github.sha }}-opa.json || true

@@ -1,0 +1,15 @@
+# Terraform local caches and state files
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfplan
+*.binary
+tfplan.json
+
+# Packaged Lambda archives and temporary test outputs
+*.zip
+/tmp/*
+opa-ksi-validation.json
+ver-eva-vuln-report.json

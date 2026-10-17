@@ -1,0 +1,37 @@
+{
+  "cpoSchemaVersion": "2026.1",
+  "ruleId": "CPO-CSO-OVR",
+  "offeringMetadata": {
+    "providerName": "Aether Security",
+    "offeringName": "Aether FedRAMP 20x Living Reference Architecture",
+    "certificationType": "20x",
+    "targetCertificationClass": "Class-C",
+    "serviceModel": ["SaaS", "PaaS"],
+    "deploymentModel": "Commercial Cloud (Shared Multi-Tenant per OMB M-24-15)"
+  },
+  "minimumAssessmentScope": {
+    "ruleId": "MAS-CSO-IIR",
+    "boundaryIdentifier": "aether-20x-mas-vpc (10.20.0.0/16)",
+    "mandatoryResourceTag": "FedRAMP-20x-MAS=In-Scope",
+    "thirdPartyResources": [
+      {
+        "ruleId": "MAS-CSO-TPR",
+        "provider": "Amazon Web Services (AWS US Commercial us-east-1)",
+        "inheritedStatus": "FedRAMP Certified Class D / High Infrastructure",
+        "compensatingControls": "All control-plane and data-plane API traffic enforced over FIPS 140-3 endpoints via AWS PrivateLink."
+      }
+    ]
+  },
+  "cryptographicModules": [
+    {
+      "moduleName": "AWS-LC Cryptographic Module",
+      "standard": "FIPS 140-3 Level 1",
+      "usage": "TLS 1.3 data in transit across S3-FIPS, KMS-FIPS, RDS, and PrivateLink endpoints (SC-08, SC-13)"
+    },
+    {
+      "moduleName": "AWS Key Management Service (KMS) HSM",
+      "standard": "FIPS 140-3 Level 3",
+      "usage": "Customer Managed Key (CMK) encryption at rest for RDS PostgreSQL, S3 WORM Evidence Vault, Secrets Manager, and CloudTrail (SC-28)"
+    }
+  ]
+}
